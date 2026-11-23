@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Cost in Hours</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one working column. "Your hour" and the totals sit on top, the add form and the category chart share a row, the ledger runs full width below. */
+:root {
+  --bg: #F1F5F6;
+  --surface: #FFFFFF;
+  --ink: #13242B;
+  --ink-2: #4A5F68;
+  --line: #D5DFE3;
+  --accent: #0A6C86;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DCEEF3;
+  --good: #1F6B3E;
+  --good-soft: #DDF0E4;
+  --warn: #8A4A06;
+  --warn-soft: #FBEBD5;
+  --crit: #A11D16;
+  --crit-soft: #F9DEDC;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1A1F;
+    --surface: #15262D;
+    --ink: #E6EEF1;
+    --ink-2: #9DB2BB;
+    --line: #28424C;
+    --accent: #5BC0DE;
+    --accent-ink: #06242C;
+    --accent-soft: #17404D;
+    --good: #7FD1A0;
+    --good-soft: #173525;
+    --warn: #F2B766;
+    --warn-soft: #3A2A12;
+    --crit: #F2928B;
+    --crit-soft: #3D1B19;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1A1F;
+  --surface: #15262D;
+  --ink: #E6EEF1;
+  --ink-2: #9DB2BB;
+  --line: #28424C;
+  --accent: #5BC0DE;
+  --accent-ink: #06242C;
+  --accent-soft: #17404D;
+  --good: #7FD1A0;
+  --good-soft: #173525;
+  --warn: #F2B766;
+  --warn-soft: #3A2A12;
+  --crit: #F2928B;
+  --crit-soft: #3D1B19;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap {
+  max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; font-weight: 700; }
+.lede { margin: 8px 0 0; max-width: 62ch; color: var(--ink-2); font-size: 1rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+
+label, .k { display: block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+input, select {
+  width: 100%; min-width: 0; height: 42px; padding: 0 12px; font: inherit; font-size: 16px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+}
+input.mono { font-family: var(--font-mono); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 0.8rem; color: var(--ink-2); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+.hour-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.rate { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); }
+.rate b { font-family: var(--font-mono); font-weight: 500; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stat { background: var(--surface); padding: 14px 18px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stat .v { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+.stat .v.text { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+.stat .s { font-size: 0.82rem; color: var(--ink-2); overflow-wrap: anywhere; }
+
+.duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; align-items: start; }
+.fgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.full { grid-column: 1 / -1; }
+.btn { height: 44px; padding: 0 18px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.btn:hover { filter: brightness(1.08); }
+.ghost { height: 34px; padding: 0 12px; font: inherit; font-size: 0.85rem; font-weight: 500; color: var(--ink-2); background: transparent; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.ghost:hover { color: var(--ink); border-color: var(--ink-2); }
+.ghost.danger { color: var(--crit); border-color: var(--crit); }
+.preview { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); min-height: 46px; }
+.preview b { font-family: var(--font-mono); font-weight: 500; }
+.msg { margin: 0; min-height: 1.3em; font-size: 0.88rem; color: var(--ink-2); }
+.msg.err { color: var(--crit); }
+
+.chart { display: flex; flex-direction: column; gap: 10px; }
+.c-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.c-label { font-size: 0.9rem; overflow-wrap: anywhere; }
+.c-track { height: 14px; border-radius: 4px; background: var(--accent-soft); overflow: hidden; }
+.c-fill { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.c-val { font-family: var(--font-mono); font-size: 0.85rem; text-align: right; white-space: nowrap; }
+.c-val small { color: var(--ink-2); font-size: 0.78rem; margin-left: 4px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.controls select { width: auto; height: 36px; font-size: 14px; }
+.ledger-panel { padding: 0; gap: 0; overflow: hidden; }
+.ledger-panel .panel-head { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.ledger { list-style: none; margin: 0; padding: 0; }
+.row {
+  --sev: var(--good); --sev-soft: var(--good-soft);
+  display: grid; grid-template-columns: minmax(0, 1fr) 96px minmax(150px, 210px) 84px; gap: 6px 18px; align-items: start;
+  padding: 14px 16px 14px 16px; border-left: 4px solid var(--sev); border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.sev-1 { --sev: var(--accent); --sev-soft: var(--accent-soft); }
+.sev-2 { --sev: var(--warn); --sev-soft: var(--warn-soft); }
+.sev-3 { --sev: var(--crit); --sev-soft: var(--crit-soft); }
+.r-main { min-width: 0; }
+.r-name { font-weight: 600; overflow-wrap: anywhere; }
+.r-meta, .r-extra { font-size: 0.82rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.r-extra { margin-top: 2px; }
+.r-price { font-family: var(--font-mono); text-align: right; padding-top: 1px; }
+.r-hours { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.r-num { font-family: var(--font-mono); font-size: 1.2rem; font-weight: 500; line-height: 1.2; }
+.r-sub { font-size: 0.8rem; color: var(--ink-2); }
+.pill { align-self: flex-start; padding: 1px 9px; border-radius: 999px; background: var(--sev-soft); color: var(--sev); font-size: 0.74rem; font-weight: 600; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--sev); }
+.r-act { text-align: right; }
+.tag { font-size: 0.74rem; color: var(--ink-2); border: 1px dashed var(--line); border-radius: 6px; padding: 2px 8px; }
+.empty { padding: 28px 20px; color: var(--ink-2); }
+.banner { margin: 0; padding: 10px 14px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 0.9rem; }
+.foot { margin: 0; font-size: 0.82rem; color: var(--ink-2); max-width: 70ch; }
+
+@media (max-width: 860px) {
+  .duo { grid-template-columns: minmax(0, 1fr); }
+  .hour-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .r-main { grid-column: 1; }
+  .r-act { grid-column: 2; grid-row: 1; }
+  .r-hours { grid-column: 1; grid-row: 2; }
+  .r-price { grid-column: 2; grid-row: 2; }
+}
+@media (max-width: 480px) {
+  .fgrid { grid-template-columns: minmax(0, 1fr); }
+  .c-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .c-label { grid-column: 1; }
+  .c-val { grid-column: 2; grid-row: 1; }
+  .c-track { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cost in Hours</h1>
+    <p class="lede">Every price is also a number of hours you worked for it. Enter your take-home pay, log what you buy, and see each purchase as time.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-hour">
+    <h2 id="h-hour">Your hour</h2>
+    <div class="hour-grid">
+      <div class="field">
+        <label for="payType">Pay is</label>
+        <select id="payType">
+          <option value="hourly">Hourly, after tax</option>
+          <option value="monthly">Monthly, after tax</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="amount" id="amountLabel">Take-home per hour</label>
+        <input id="amount" class="mono" type="number" inputmode="decimal" min="0" step="any">
+      </div>
+      <div class="field">
+        <label for="hpw">Hours worked per week</label>
+        <input id="hpw" class="mono" type="number" inputmode="decimal" min="1" max="120" step="any">
+      </div>
+      <div class="field">
+        <label for="currency">Currency</label>
+        <select id="currency"></select>
+      </div>
+    </div>
+    <p class="rate" id="rateLine"></p>
+  </section>
+
+  <p class="banner" id="banner" hidden></p>
+
+  <section class="stats" id="stats" aria-label="Summary"></section>
+
+  <div class="duo">
+    <section class="panel" aria-labelledby="h-add">
+      <h2 id="h-add">Add a purchase</h2>
+      <form id="addForm" class="fgrid" novalidate>
+        <div class="field full">
+          <label for="pName">What did you buy</label>
+          <input id="pName" type="text" maxlength="80" autocomplete="off" placeholder="Running shoes">
+        </div>
+        <div class="field">
+          <label for="pPrice">Price</label>
+          <input id="pPrice" class="mono" type="number" inputmode="decimal" min="0" step="any" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label for="pCat">Category</label>
+          <select id="pCat"></select>
+        </div>
+        <div class="field">
+          <label for="pDate">Date</label>
+          <input id="pDate" type="date">
+        </div>
+        <div class="field">
+          <label for="pFreq">Charged</label>
+          <select id="pFreq">
+            <option value="once">One time</option>
+            <option value="monthly">Every month</option>
+            <option value="yearly">Every year</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="pUses">Times you expect to use it <span class="hint">(optional)</span></label>
+          <input id="pUses" class="mono" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 150 wears">
+        </div>
+        <p class="preview full" id="preview" role="status" aria-live="polite"></p>
+        <div class="full"><button class="btn" type="submit">Add purchase</button></div>
+        <p class="msg full" id="msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="h-cat">
+      <h2 id="h-cat">Hours by category</h2>
+      <div class="chart" id="chart"></div>
+    </section>
+  </div>
+
+  <section class="panel ledger-panel" aria-labelledby="h-ledger">
+    <div class="panel-head">
+      <h2 id="h-ledger">Purchase ledger</h2>
+      <div class="controls">
+        <select id="period" aria-label="Time period">
+          <option value="all">All time</option>
+          <option value="month">This month</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <select id="sortBy" aria-label="Sort order">
+          <option value="date">Newest first</option>
+          <option value="hours">Most hours first</option>
+        </select>
+      </div>
+    </div>
+    <ol class="ledger" id="ledger"></ol>
+  </section>
+
+  <p class="foot" id="where"></p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var ymd = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  var daysAgo = function (n) { var d = new Date(); d.setDate(d.getDate() - n); return ymd(d); };
+  var TODAY = ymd(new Date());
+  var CATS = ['Food & drink', 'Transport', 'Home', 'Tech', 'Clothing', 'Fun & travel', 'Health', 'Subscriptions', 'Other'];
+  var CURRENCIES = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['EGP', 'Egyptian pound'], ['SAR', 'Saudi riyal'], ['AED', 'UAE dirham'], ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['INR', 'Indian rupee'], ['JPY', 'Japanese yen']];
+  var FREQ = { once: 'one-time', monthly: 'monthly', yearly: 'yearly' };
+  var DEFAULTS = { payType: 'hourly', amount: 15, hoursPerWeek: 40, currency: 'USD', started: false };
+  var LS_KEY = 'cost-in-hours-v1';
+
+  var settings = Object.assign({}, DEFAULTS);
+  var purchases = [];
+  var loaded = false, stalled = false, col = null, storageKind = 'pending';
+  var period = 'all', sortBy = 'date';
+  var settingsDirty = false, sv = 0, pt = null, flashT = null;
+  var writeChain = Promise.resolve();
+
+  var EXAMPLES = [
+    { id: 'ex1', name: 'Morning coffee', price: 4.5, category: 'Food & drink', date: daysAgo(1), freq: 'once', uses: null },
+    { id: 'ex2', name: 'Wireless headphones', price: 129, category: 'Tech', date: daysAgo(9), freq: 'once', uses: 400 },
+    { id: 'ex3', name: 'Streaming plan', price: 12.99, category: 'Subscriptions', date: daysAgo(14), freq: 'monthly', uses: null },
+    { id: 'ex4', name: 'Winter jacket', price: 180, category: 'Clothing', date: daysAgo(20), freq: 'once', uses: 120 },
+    { id: 'ex5', name: 'Weekend train tickets', price: 48, category: 'Transport', date: daysAgo(6), freq: 'once', uses: null },
+    { id: 'ex6', name: 'Concert tickets', price: 95, category: 'Fun & travel', date: daysAgo(3), freq: 'once', uses: null },
+    { id: 'ex7', name: 'Standing desk', price: 420, category: 'Home', date: daysAgo(26), freq: 'once', uses: 1500 }
+  ];
+
+  /* ---------- maths ---------- */
+  function hpw() { return Math.max(1, +settings.hoursPerWeek || 40); }
+  function hpd() { return hpw() / 5; }
+  function rate() {
+    var a = Math.max(0, +settings.amount || 0);
+    return settings.payType === 'monthly' ? a / (hpw() * 52 / 12) : a;
+  }
+  function money(n) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: settings.currency, maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2 }).format(n);
+    } catch (e) { return n.toFixed(2); }
+  }
+  function hoursOf(price) { var r = rate(); return r > 0 ? price / r : 0; }
+  function hLabel(h) {
+    if (!(h > 0)) return '0 min';
+    if (h < 1) return Math.max(1, Math.round(h * 60)) + ' min';
+    if (h < 10) return h.toFixed(1) + ' h';
+    return Math.round(h).toLocaleString() + ' h';
+  }
+  function dLabel(h) {
+    var d = h / hpd(), w = h / hpw();
+    if (!(h > 0) || d < 0.1) return '';
+    if (w >= 1) { var ws = w.toFixed(1); return ws + (ws === '1.0' ? ' work week' : ' work weeks'); }
+    if (d < 1) return Math.round(d * 100) + '% of a workday';
+    var ds = d.toFixed(1); return ds + (ds === '1.0' ? ' workday' : ' workdays');
+  }
+  var SEV_LABELS = ['Under an hour', 'Part of a workday', 'Days of work', 'A week or more'];
+  function sev(h) { if (h < 1) return 0; if (h < hpd()) return 1; if (h < hpw()) return 2; return 3; }
+  function dateLabel(s) {
+    var d = new Date(s + 'T00:00:00');
+    if (isNaN(d)) return s;
+    var opts = { day: 'numeric', month: 'short' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString(undefined, opts);
+  }
+
+  /* ---------- data in view ---------- */
+  function usingExamples() { return !loaded || (purchases.length === 0 && !settings.started); }
+  function source() { return usingExamples() ? EXAMPLES : purchases; }
+  function inPeriod(p) {
+    if (period === 'all') return true;
+    if (period === 'month') return p.date.slice(0, 7) === TODAY.slice(0, 7);
+    return p.date >= daysAgo(30);
+  }
+  function viewList() { return source().filter(inPeriod); }
+
+  /* ---------- render ---------- */
+  function renderRate() {
+    var r = rate();
+    $('#amountLabel').textContent = settings.payType === 'monthly' ? 'Take-home per month' : 'Take-home per hour';
+    $('#rateLine').innerHTML = r > 0
+      ? 'One hour of your work is worth <b>' + esc(money(r)) + '</b>. A workday of ' + esc(hpd().toFixed(hpd() % 1 ? 1 : 0)) + ' hours is worth <b>' + esc(money(r * hpd())) + '</b>.'
+      : 'Enter your take-home pay to see prices as hours.';
+  }
+  function renderBanner() {
+    var b = $('#banner');
+    var msg = '';
+    if (!loaded && stalled) msg = 'Your saved purchases can’t be reached yet. Showing examples until they load.';
+    else if (!loaded && storageKind === 'pending') msg = 'Loading your saved purchases. Showing examples for now.';
+    else if (usingExamples()) msg = 'These are example purchases. Set your pay above and add your first purchase to replace them.';
+    b.hidden = !msg; b.textContent = msg;
+  }
+  function renderStats() {
+    var list = viewList();
+    var spent = 0, hours = 0, top = null;
+    list.forEach(function (p) {
+      var h = hoursOf(p.price); spent += p.price; hours += h;
+      if (!top || h > top.h) top = { p: p, h: h };
+    });
+    var noRate = rate() <= 0;
+    var items = [
+      ['Spent', money(spent), list.length + (list.length === 1 ? ' purchase' : ' purchases'), false],
+      ['Hours of work', noRate ? '—' : hLabel(hours), noRate ? 'Add your pay first' : 'at ' + money(rate()) + ' an hour', false],
+      ['In workdays', noRate ? '—' : (hours / hpd()).toFixed(1), noRate ? '' : dLabel(hours) || 'under a tenth of a day', false],
+      ['Biggest cost', top ? top.p.name : '—', top && !noRate ? hLabel(top.h) + ' of work' : '', true]
+    ];
+    $('#stats').innerHTML = items.map(function (it) {
+      return '<div class="stat"><span class="k">' + esc(it[0]) + '</span><span class="v' + (it[3] ? ' text' : '') + '">' + esc(it[1]) + '</span><span class="s">' + esc(it[2]) + '</span></div>';
+    }).join('');
+  }
+  function renderChart() {
+    var list = viewList(), by = {}, total = 0;
+    list.forEach(function (p) { var h = hoursOf(p.price); by[p.category] = (by[p.category] || 0) + h; total += h; });
+    var rows = Object.keys(by).map(function (k) { return [k, by[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
+    var el = $('#chart');
+    if (!rows.length || total <= 0) { el.innerHTML = '<p class="msg">Nothing to chart yet for this period.</p>'; return; }
+    var max = rows[0][1];
+    el.innerHTML = rows.map(function (r) {
+      var pct = Math.round(r[1] / total * 100);
+      return '<div class="c-row"><span class="c-label">' + esc(r[0]) + '</span><span class="c-track"><span class="c-fill" style="width:' + (r[1] / max * 100).toFixed(1) + '%"></span></span><span class="c-val">' + esc(hLabel(r[1])) + '<small>' + pct + '%</small></span></div>';
+    }).join('');
+  }
+  function renderLedger() {
+    var list = viewList().slice();
+    var ex = usingExamples();
+    list.sort(function (a, b) {
+      if (sortBy === 'hours') return b.price - a.price;
+      return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.created || 0) - (a.created || 0);
+    });
+    var el = $('#ledger');
+    if (!list.length) {
+      el.innerHTML = '<li class="empty">' + (period === 'all' ? 'No purchases yet. Add one and it appears here as hours of work.' : 'No purchases in this period.') + '</li>';
+      return;
+    }
+    var maxH = 0;
+    list.forEach(function (p) { maxH = Math.max(maxH, hoursOf(p.price)); });
+    var noRate = rate() <= 0;
+    el.innerHTML = list.map(function (p) {
+      var h = hoursOf(p.price), s = sev(h);
+      var extras = [];
+      if (p.uses > 0) extras.push(noRate ? money(p.price / p.uses) + ' per use' : hLabel(h / p.uses) + ' of work per use · ' + money(p.price / p.uses) + ' per use');
+      if (p.freq === 'monthly' && !noRate) extras.push('≈ ' + hLabel(h * 12) + ' of work per year');
+      var act = ex || /^ex/.test(p.id) ? '<span class="tag">Example</span>' : '<button type="button" class="ghost" data-del="' + esc(p.id) + '">Delete</button>';
+      return '<li class="row sev-' + s + '">' +
+        '<div class="r-main"><div class="r-name">' + esc(p.name) + '</div>' +
+        '<div class="r-meta">' + esc(p.category) + ' · ' + esc(dateLabel(p.date)) + ' · ' + esc(FREQ[p.freq] || 'one-time') + '</div>' +
+        (extras.length ? '<div class="r-extra">' + esc(extras.join(' · ')) + '</div>' : '') + '</div>' +
+        '<div class="r-price">' + esc(money(p.price)) + '</div>' +
+        '<div class="r-hours">' + (noRate ? '<div class="r-sub">Add your pay to see hours</div>' :
+          '<div class="r-num">' + esc(hLabel(h)) + '</div><div class="r-sub">' + esc(dLabel(h) || ' ') + '</div>' +
+          '<span class="pill">' + SEV_LABELS[s] + '</span><div class="bar"><span style="width:' + (maxH > 0 ? Math.max(2, h / maxH * 100).toFixed(1) : 0) + '%"></span></div>') + '</div>' +
+        '<div class="r-act">' + act + '</div></li>';
+    }).join('');
+  }
+  function renderWhere() {
+    var t = '';
+    if (storageKind === 'db') t = 'Your pay and purchases are saved privately to your account. Other people who open this page see their own entries, not yours.';
+    else if (storageKind === 'local') t = 'Your pay and purchases are saved in this browser only. Clearing site data removes them.';
+    $('#where').textContent = t;
+  }
+  function renderAll() { renderRate(); renderBanner(); renderStats(); renderChart(); renderLedger(); renderWhere(); updatePreview(); }
+
+  function updatePreview() {
+    var price = parseFloat($('#pPrice').value), uses = parseFloat($('#pUses').value);
+    var el = $('#preview');
+    if (rate() <= 0) { el.textContent = 'Enter your take-home pay above to see prices as hours.'; return; }
+    if (!(price > 0)) { el.textContent = 'Enter a price to see what it costs in hours of work.'; return; }
+    var h = hoursOf(price), d = dLabel(h);
+    var html = 'That costs <b>' + esc(hLabel(h)) + '</b> of your work' + (d ? ' (' + esc(d) + ')' : '') + '.';
+    if (uses > 0) html += ' About <b>' + esc(hLabel(h / uses)) + '</b> of work each time you use it.';
+    el.innerHTML = html;
+  }
+  function flash(text, isErr) {
+    var m = $('#msg'); m.textContent = text; m.className = 'msg full' + (isErr ? ' err' : '');
+    clearTimeout(flashT);
+    if (!isErr) flashT = setTimeout(function () { m.textContent = ''; }, 6000);
+  }
+
+  /* ---------- settings ---------- */
+  function syncSettingsInputs() {
+    var map = { payType: '#payType', amount: '#amount', hoursPerWeek: '#hpw', currency: '#currency' };
+    Object.keys(map).forEach(function (k) {
+      var el = $(map[k]);
+      if (el !== document.activeElement && String(el.value) !== String(settings[k])) el.value = settings[k];
+    });
+  }
+  function markSettings() { settingsDirty = true; sv++; persistSettings(); }
+  function persistSettings() {
+    clearTimeout(pt);
+    pt = setTimeout(function () {
+      queue(function () {
+        var v = sv, snap = Object.assign({}, settings);
+        var done = function () { if (v === sv) settingsDirty = false; };
+        if (col) return col.doc('settings').set(snap).then(done);
+        lsWrite(); done();
+      });
+    }, 500);
+  }
+  function onSettings() {
+    settings.payType = $('#payType').value;
+    settings.amount = parseFloat($('#amount').value) || 0;
+    settings.hoursPerWeek = parseFloat($('#hpw').value) || 0;
+    settings.currency = $('#currency').value;
+    markSettings(); renderAll();
+  }
+
+  /* ---------- storage ---------- */
+  function queue(fn) {
+    writeChain = writeChain.then(fn).catch(function () {
+      flash('Couldn’t save that. Check your connection or your access to this page.', true);
+    });
+    return writeChain;
+  }
+  function validP(p) { return p && typeof p.name === 'string' && isFinite(+p.price) && +p.price > 0 && typeof p.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date); }
+  function cleanP(p, id) {
+    return { id: id, name: p.name, price: +p.price, category: CATS.indexOf(p.category) >= 0 ? p.category : 'Other', date: p.date, freq: FREQ[p.freq] ? p.freq : 'once', uses: +p.uses > 0 ? +p.uses : null, created: +p.created || 0 };
+  }
+  function lsWrite() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ settings: settings, purchases: purchases })); }
+    catch (e) { flash('This browser blocked saving, so your entries last only until you close the page.', true); }
+  }
+  function loadLocal() {
+    storageKind = 'local';
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        var o = JSON.parse(raw);
+        settings = Object.assign({}, DEFAULTS, o.settings || {});
+        purchases = (Array.isArray(o.purchases) ? o.purchases : []).filter(validP).map(function (p) { return cleanP(p, String(p.id)); });
+      }
+    } catch (e) {}
+    loaded = true; syncSettingsInputs(); renderAll();
+  }
+  function applySnap(snap) {
+    if (snap.metadata && snap.metadata.fromCache && snap.empty) return;
+    var next = [], s = null;
+    snap.docs.forEach(function (d) {
+      var v = d.data(); if (!v) return;
+      if (d.id === 'settings') s = v;
+      else if (d.id.indexOf('p-') === 0 && validP(v)) next.push(cleanP(v, d.id));
+    });
+    purchases = next;
+    if (s && !settingsDirty) settings = Object.assign({}, DEFAULTS, s);
+    loaded = true; syncSettingsInputs(); renderAll();
+  }
+  function initStore() {
+    var uidP = Promise.resolve([null, null]);
+    if (window.claude && typeof window.claude.use === 'function') {
+      uidP = Promise.all([window.claude.use('user'), window.claude.use('db')]).then(function (r) {
+        var user = r[0], db = r[1];
+        if (!user || !db) return [null, null];
+        return user.id().then(function (id) { return [id, db]; });
+      }).catch(function () { return [null, null]; });
+    }
+    uidP.then(function (r) {
+      var uid = r[0], db = r[1];
+      if (!uid || !db) { loadLocal(); return; }
+      storageKind = 'db';
+      col = db.collection('data/users/' + uid);
+      var t = setTimeout(function () { if (!loaded) { stalled = true; renderBanner(); } }, 10000);
+      col.onSnapshot(function (snap) { clearTimeout(t); applySnap(snap); }, function () {
+        clearTimeout(t); col = null; loadLocal();
+        flash('Your saved data isn’t available here, so new entries stay in this browser only.', true);
+      });
+      renderWhere();
+    });
+  }
+
+  /* ---------- events ---------- */
+  $('#addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('#pName').value.trim(), price = parseFloat($('#pPrice').value);
+    if (!name) { flash('Give the purchase a name.', true); $('#pName').focus(); return; }
+    if (!(price > 0)) { flash('Enter a price above zero.', true); $('#pPrice').focus(); return; }
+    var u = parseFloat($('#pUses').value);
+    var p = { name: name.slice(0, 80), price: Math.round(price * 100) / 100, category: $('#pCat').value, date: $('#pDate').value || TODAY, freq: $('#pFreq').value, uses: u > 0 ? Math.round(u) : null, created: Date.now() };
+    var id = 'p-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    var h = hoursOf(p.price);
+    if (!settings.started) { settings.started = true; markSettings(); }
+    if (col) { var body = Object.assign({}, p); queue(function () { return col.doc(id).set(body); }); }
+    else { purchases.push(cleanP(p, id)); lsWrite(); }
+    $('#pName').value = ''; $('#pPrice').value = ''; $('#pUses').value = '';
+    renderAll();
+    flash(rate() > 0 ? 'Added ' + p.name + ': ' + hLabel(h) + ' of work.' : 'Added ' + p.name + '.');
+    $('#pName').focus();
+  });
+  $('#pPrice').addEventListener('input', updatePreview);
+  $('#pUses').addEventListener('input', updatePreview);
+  ['#payType', '#amount', '#hpw', '#currency'].forEach(function (s) { $(s).addEventListener('input', onSettings); });
+  $('#period').addEventListener('change', function (e) { period = e.target.value; renderStats(); renderChart(); renderLedger(); });
+  $('#sortBy').addEventListener('change', function (e) { sortBy = e.target.value; renderLedger(); });
+  $('#ledger').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-del]'); if (!btn) return;
+    if (!btn.classList.contains('danger')) {
+      btn.classList.add('danger'); btn.textContent = 'Confirm';
+      setTimeout(function () { if (btn.isConnected) { btn.classList.remove('danger'); btn.textContent = 'Delete'; } }, 3000);
+      return;
+    }
+    var id = btn.getAttribute('data-del');
+    if (col) queue(function () { return col.doc(id).delete(); });
+    else { purchases = purchases.filter(function (p) { return p.id !== id; }); lsWrite(); renderAll(); }
+  });
+
+  /* ---------- boot ---------- */
+  $('#currency').innerHTML = CURRENCIES.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' · ' + esc(c[1]) + '</option>'; }).join('');
+  $('#pCat').innerHTML = CATS.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+  $('#pDate').value = TODAY; $('#pDate').max = TODAY;
+  syncSettingsInputs();
+  renderAll();
+  initStore();
+})();
+</script>
+</body>
+</html>
